@@ -670,3 +670,4 @@ curl -i -X POST http://localhost:8000/api/matches/1/approve/ \
   -H "X-Organization: bluebird"
 ```
 *(Returns `HTTP/1.1 404 Not Found` with `{"detail": "Match proposal not found."}`)*
+
