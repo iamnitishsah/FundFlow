@@ -38,6 +38,10 @@ from .services.reconciliation_service import (
     ReconciliationService,
     ReconciliationConflictError,
 )
+from .services.airtable_client import (
+    FakeAirtableClient,
+    AirtableSyncService,
+)
 
 
 class DummyScopedView(TenantScopedMixin, APIView):
@@ -412,3 +416,44 @@ class MatchingEngineEdgeCasesTestCase(TestCase):
         self.assertEqual(normalize_investor_name("Meridian Partners LP"), "MERIDIAN PARTNERS")
         self.assertTrue(is_name_in_description("PATEL FAMILY TRUST", "WIRE INCOMING PATEL FAMILY TRUST"))
         self.assertFalse(is_name_in_description("PATEL FAMILY TRUST", "WIRE INCOMING PATEL FAMILY TRUSTEE"))
+
+
+class AirtableBonusSyncTestCase(TestCase):
+    def setUp(self):
+        self.org = Organization.objects.create(
+            slug="northwind",
+            name="Northwind Ventures",
+        )
+        self.fake_client_success = FakeAirtableClient(should_fail=False, record_id="recSuccess987")
+        self.fake_client_failure = FakeAirtableClient(should_fail=True)
+
+    def test_airtable_sync_success_on_needs_review(self):
+        from .services.airtable_client import AirtableSyncService
+        service = CsvImportService(
+            organization=self.org,
+            airtable_service=AirtableSyncService(client=self.fake_client_success),
+        )
+        csv_data = "date,description,amount,type,reference\n2026-04-09,UNKNOWN WIRE,999.00,credit,REF_AIRTABLE_1\n"
+        result = service.parse_and_import(csv_data)
+        self.assertEqual(result["imported_count"], 1)
+
+        txn = BankTransaction.objects.get(bank_reference="REF_AIRTABLE_1")
+        self.assertEqual(txn.status, BankTransaction.STATUS_NEEDS_REVIEW)
+        self.assertEqual(txn.airtable_sync_status, "synced")
+        self.assertEqual(txn.airtable_record_id, "recSuccess987")
+        self.assertEqual(len(self.fake_client_success.created_records), 1)
+
+    def test_airtable_sync_failure_does_not_break_import(self):
+        from .services.airtable_client import AirtableSyncService
+        service = CsvImportService(
+            organization=self.org,
+            airtable_service=AirtableSyncService(client=self.fake_client_failure),
+        )
+        csv_data = "date,description,amount,type,reference\n2026-04-09,UNKNOWN WIRE,999.00,credit,REF_AIRTABLE_2\n"
+        result = service.parse_and_import(csv_data)
+        self.assertEqual(result["imported_count"], 1)
+
+        txn = BankTransaction.objects.get(bank_reference="REF_AIRTABLE_2")
+        self.assertEqual(txn.status, BankTransaction.STATUS_NEEDS_REVIEW)
+        self.assertEqual(txn.airtable_sync_status, "sync_failed")
+        self.assertIn("Simulated Airtable", txn.airtable_error)
