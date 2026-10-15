@@ -23,7 +23,7 @@
 
 1. **Clone the repository and prepare environment variables**:
    ```bash
-   cp .env.example backend/.env
+   cp backend/.env
    ```
 
 2. **Start PostgreSQL and the Django backend container**:
@@ -224,9 +224,7 @@ All 8 minimum required assessment test cases are explicitly tested in `backend/r
 
 - **Assumptions**: The CSV date format is strictly `YYYY-MM-DD`. Debits are recorded as `ignored` immediately and excluded from matching.
 - **Trade-offs**: Built with synchronous processing for transparency and immediate UI feedback; transactions are calculated at import time to ensure instant responses.
-- **Next Steps**:
-  - Add WebSocket/SSE support for real-time multi-user live balance updates.
-  - Add export capability for reconciled audit logs in PDF or CSV formats.
+
 
 ---
 
