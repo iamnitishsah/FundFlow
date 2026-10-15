@@ -2,12 +2,13 @@ import csv
 import io
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
-from typing import Dict, List, Any, Union
+from typing import Dict, List, Any, Union, Optional
 from django.db import transaction
 from rest_framework import status
 from rest_framework.exceptions import APIException
 from reconciliation.models import Organization, BankTransaction
 from .matching_engine import MatchingEngineService
+from .airtable_client import AirtableSyncService
 
 
 class MissingCsvColumnError(APIException):
@@ -19,9 +20,15 @@ class MissingCsvColumnError(APIException):
 class CsvImportService:
     REQUIRED_COLUMNS = ["date", "description", "amount", "type", "reference"]
 
-    def __init__(self, organization: Organization):
+    def __init__(
+        self,
+        organization: Organization,
+        matching_engine: Optional[MatchingEngineService] = None,
+        airtable_service: Optional[AirtableSyncService] = None,
+    ):
         self.organization = organization
-        self.matching_engine = MatchingEngineService()
+        self.matching_engine = matching_engine or MatchingEngineService()
+        self.airtable_service = airtable_service or AirtableSyncService()
 
     def parse_and_import(
         self,
@@ -176,6 +183,9 @@ class CsvImportService:
             for txn in created_transactions:
                 if txn.type == BankTransaction.TYPE_CREDIT:
                     self.matching_engine.process_transaction(txn)
+
+                if txn.status == BankTransaction.STATUS_NEEDS_REVIEW:
+                    self.airtable_service.sync_transaction(txn)
 
         return {
             "imported_count": len(created_transactions),

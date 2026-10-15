@@ -185,6 +185,17 @@ class BankTransaction(models.Model):
     )
     needs_review_reason = models.TextField(blank=True, default="")
     raw_file_line = models.PositiveIntegerField(null=True, blank=True)
+    airtable_record_id = models.CharField(max_length=100, blank=True, default="")
+    airtable_sync_status = models.CharField(
+        max_length=20,
+        choices=[
+            ("not_synced", "Not Synced"),
+            ("synced", "Synced"),
+            ("sync_failed", "Sync Failed"),
+        ],
+        default="not_synced",
+    )
+    airtable_error = models.TextField(blank=True, default="")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
